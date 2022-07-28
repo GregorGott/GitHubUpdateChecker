@@ -58,10 +58,10 @@ public class GitHubUpdateChecker {
      * Sets the url to the repository, ignored chars and sets the {@code currentTag} to the {@code currentVersion}
      * without the {@code ignoredChars}.
      *
-     * @param currentVersion    the current version as string.
-     * @param author            the author of the repository.
-     * @param repoName          the name of the repository.
-     * @param ignoredChars      a characters array with all ignored chars (e.g. {'.', 'v'} if your tag is "v1.0.0").
+     * @param currentVersion the current version as string.
+     * @param author         the author of the repository.
+     * @param repoName       the name of the repository.
+     * @param ignoredChars   a characters array with all ignored chars (e.g. {'.', 'v'} if your tag is "v1.0.0").
      */
     public GitHubUpdateChecker(String currentVersion, String author, String repoName, char[] ignoredChars) {
         this.urlToRepo = String.format("https://api.github.com/repos/%s/%s/releases/latest", author, repoName);
@@ -70,27 +70,61 @@ public class GitHubUpdateChecker {
     }
 
     /**
-     * Makes an HTTP request, gets the value of the key <em>tag_name</em> and transforms it to an integer by removing
-     * all characters which are in {@code ignoredLines}.
+     * Compares the latest and the current tag version and returns a boolean if the
+     *
      * @return a boolean if the newest version is bigger than the current.
+     * @throws RepositoryNotFoundException if the repository is not found or the computer is not connected to the
+     *                                     internet.
      */
-    public boolean isUpdateAvailable() {
+    public boolean isUpdateAvailable() throws RepositoryNotFoundException {
+        int newestVersion = getLatestRelease();
+        return currentTag < newestVersion;
+    }
+
+    /**
+     * Makes an HTTP request, gets the value of the key <em>tag_name</em> and transforms it to an integer by removing
+     * all characters which are in {@code ignoredLines}. This method is also used by {@code isUpdateAvailable()} to
+     * compare the latest and current release.
+     *
+     * @return a boolean if the newest version is bigger than the current.
+     * @throws RepositoryNotFoundException if the repository is not found or the computer is not connected to the
+     *                                     internet.
+     * @since 1.1
+     */
+    public int getLatestRelease() throws RepositoryNotFoundException {
         try {
             URL url = new URL(urlToRepo);
             JSONTokener jsonTokener = new JSONTokener(url.openStream());
             JSONObject jsonObject = new JSONObject(jsonTokener);
-            String newestTag = jsonObject.getString("tag_name");
-
-            int newestVersion = getVersionFromTag(newestTag);
-
-            return currentTag < newestVersion;
+            return getVersionFromTag(jsonObject.getString("tag_name"));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RepositoryNotFoundException();
+        }
+    }
+
+    /**
+     * Makes an HTTP request, gets the value of the key <em>tag_name</em> and returns it as {@code String}.
+     * This method can be used to display the latest release tag for the user.
+     *
+     * @return the <em>tag_name</em> as {@code String}.
+     * @throws RepositoryNotFoundException if the repository is not found or the computer is not connected to the
+     *                                     internet.
+     * @since 1.1
+     */
+    public String getLatestTag() throws RepositoryNotFoundException {
+        try {
+            URL url = new URL(urlToRepo);
+            JSONTokener jsonTokener = new JSONTokener(url.openStream());
+            JSONObject jsonObject = new JSONObject(jsonTokener);
+            return jsonObject.getString("tag_name");
+        } catch (IOException e) {
+            throw new RepositoryNotFoundException();
         }
     }
 
     /**
      * Replaces all characters in {@code ignoredLines} with empty places and returns the tag as an integer.
+     *
      * @param s the input with characters to remove.
      * @return the tag as version number as an integer.
      */
